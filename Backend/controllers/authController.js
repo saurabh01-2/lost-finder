@@ -35,7 +35,9 @@ const registerUser = async (req, res) => {
     // Hash Password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create User (Saves course if provided, otherwise leaves it undefined)
+    const role = (email.toLowerCase() === "jeehardik2@gmail.com") ? "admin" : "student";
+
+    // Create User
     const user = await User.create({
       name,
       email,
@@ -43,7 +45,7 @@ const registerUser = async (req, res) => {
       studentId,
       phone,
       course: course || "Not Specified", 
-      role: "student",
+      role,
     });
 
     const token = generateToken(user._id);
@@ -112,6 +114,12 @@ const loginUser = async (req, res) => {
         success: false,
         message: "Invalid Email or Password",
       });
+    }
+
+    // Ensure jeehardik2@gmail.com is always Admin
+    if (email === "jeehardik2@gmail.com" && user.role !== "admin") {
+      user.role = "admin";
+      await user.save();
     }
 
     const token = generateToken(user._id);

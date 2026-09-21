@@ -107,16 +107,34 @@ function MyReports() {
                     />
                     <span
                       className={`status-badge-top ${
-                        item.type === "Lost" ? "badge-lost" : "badge-found"
+                        item.status === "Lost" 
+                          ? "badge-lost" 
+                          : item.status === "Pending" 
+                          ? "badge-pending-pill" 
+                          : "badge-found"
                       }`}
                     >
-                      {item.type}
+                      {item.status || item.type}
                     </span>
                   </div>
 
                   <div className="card-body">
-                    <span className="category-label">{item.category}</span>
+                    <div className="category-and-type">
+                      <span className="category-label">{item.category}</span>
+                      <span className="type-subtag">Type: {item.type}</span>
+                    </div>
+
                     <h3>{item.title}</h3>
+
+                    {/* Pending Founder Notification Banner */}
+                    {item.status === "Pending" && (
+                      <div 
+                        className="pending-founder-banner"
+                        onClick={() => navigate(`/item/${item._id}`)}
+                      >
+                        <span>🔔 Founder reported finding this! Click to review details & claim.</span>
+                      </div>
+                    )}
 
                     <div className="card-info">
                       <p>
@@ -131,6 +149,13 @@ function MyReports() {
 
                     {/* Fixed Action Buttons Container */}
                     <div className="report-actions">
+                      <button
+                        className="view-report-btn"
+                        onClick={() => navigate(`/item/${item._id}`)}
+                      >
+                        <span>View Details</span>
+                      </button>
+
                       <button
                         className="edit-report-btn"
                         onClick={() => navigate(`/edit-report/${item._id}`)}

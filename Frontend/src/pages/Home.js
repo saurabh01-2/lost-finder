@@ -28,7 +28,7 @@ function Home() {
   const [showPopup, setShowPopup] = useState(false);
 
   const categories = [
-    "All", "Watch", "Laptop", "Bag", "Books", "ID Cards", 
+    "All", "Watch", "Laptop", "Bag", "Books", "ID Cards",
     "Keys", "Wallet", "Electronics", "Clothes", "Bottle", "Others",
   ];
 
@@ -68,48 +68,48 @@ function Home() {
   }, []);
 
   const fetchHomeData = async () => {
-  try {
-    const response = await api.get("/items");
+    try {
+      const response = await api.get("/items");
 
-    if (response.data.success) {
-      const items = response.data.items;
+      if (response.data.success) {
+        const items = response.data.items;
 
-      setRecentItems(items.slice(0, 6));
+        setRecentItems(items.slice(0, 6));
 
-      setStats({
-        found: items.filter((item) => item.type === "Found").length,
-        lost: items.filter((item) => item.type === "Lost").length,
-      });
+        setStats({
+          found: items.filter((item) => item.type === "Found").length,
+          lost: items.filter((item) => item.type === "Lost").length,
+        });
+      }
+    } catch (error) {
+      console.log(error);
     }
-  } catch (error) {
-    console.log(error);
-  }
-};
+  };
 
   const filteredItems = recentItems.filter((item) => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.location.toLowerCase().includes(searchQuery.toLowerCase());
+      item.location.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-const dashboardStats = [
-  {
-    title: "Found Items",
-    value: stats.found,
-    icon: "📦",
-  },
-  {
-    title: "Lost Items",
-    value: stats.lost,
-    icon: "🔍",
-  },
-  {
-    title: "Welcome",
-    value: user ? user.name : "Guest",
-    icon: "👋",
-  },
-];
+  const dashboardStats = [
+    {
+      title: "Found Items",
+      value: stats.found,
+      icon: "📦",
+    },
+    {
+      title: "Lost Items",
+      value: stats.lost,
+      icon: "🔍",
+    },
+    {
+      title: "Welcome",
+      value: user ? user.name : "Guest",
+      icon: "👋",
+    },
+  ];
 
   return (
     <div className="app-canvas">
@@ -126,7 +126,7 @@ const dashboardStats = [
               <FaTimes />
             </button>
             <div className="popup-icon"><FaBell /></div>
-            <h2>Welcome to Campus Finder! 🎉</h2>
+            <h2>Welcome to Lost Finder! 🎉</h2>
             <p>Your immersive, fully animated dashboard is ready. Find lost items instantly with smart tracking.</p>
             <button className="popup-btn gradient-btn" onClick={() => setShowPopup(false)}>
               Let's Explore
@@ -136,7 +136,7 @@ const dashboardStats = [
       )}
 
       <div className={`home-page ${isLoaded ? "loaded" : ""}`}>
-        
+
         {/* --- HERO SECTION --- */}
         <section className="dashboard-hero slide-down glass-panel">
           <div className="hero-left">
@@ -169,8 +169,8 @@ const dashboardStats = [
 
           <div className="hero-right">
             {dashboardStats.map((stat, index) => (
-              <div 
-                className="stat-card glass-panel" 
+              <div
+                className="stat-card glass-panel"
                 key={stat.title}
                 style={{ "--delay": `${index * 0.15}s` }}
               >
@@ -222,9 +222,9 @@ const dashboardStats = [
               <h3>No items found</h3>
               <p>We couldn't find anything matching your search criteria.</p>
               <button className="gradient-btn" onClick={() => {
-                  setSearchQuery(""); setActiveCategory("All");
+                setSearchQuery(""); setActiveCategory("All");
               }}>
-                  Reset Filters
+                Reset Filters
               </button>
             </div>
           ) : (

@@ -8,6 +8,7 @@ const {
   toggleUserStatus,
   deleteUser,
   getAllItems,
+  updateItemStatus,
   deleteItem,
 } = require("../controllers/adminController");
 
@@ -43,6 +44,10 @@ router.delete("/users/:id", protect, adminOnly, deleteUser);
 // Get All Items
 // GET /api/admin/items
 router.get("/items", protect, adminOnly, getAllItems);
+
+// Update Item Status
+// PUT /api/admin/items/:id/status
+router.put("/items/:id/status", protect, adminOnly, updateItemStatus);
 
 // Delete Any Item
 // DELETE /api/admin/items/:id

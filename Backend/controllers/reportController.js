@@ -3,7 +3,259 @@ const Item = require("../models/Item");
 const Notification = require("../models/Notification");
 
 // ==========================================
-// Submit Claim
+// Founder Reports Finding A Lost Item
+// POST /api/reports/found-match/:itemId
+// Private
+// ==========================================
+const submitFoundMatch = async (req, res) => {
+  try {
+    const { founderContact, founderLocation, dateFound, message } = req.body;
+
+    const item = await Item.findById(req.params.itemId);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Lost item not found",
+      });
+    }
+
+    if (item.user.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot report finding your own lost item.",
+      });
+    }
+
+    // Check if user already submitted a pending found report for this item
+    const existingClaim = await Claim.findOne({
+      user: req.user._id,
+      item: item._id,
+      status: "Pending",
+    });
+
+    if (existingClaim) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already submitted a found report for this item. Please wait for the owner to review.",
+      });
+    }
+
+    // Create the Claim record with founder details
+    const claim = await Claim.create({
+      user: req.user._id,
+      item: item._id,
+      owner: item.user,
+      claimType: "FOUND_REPORT",
+      founderName: req.user.name,
+      founderContact: founderContact || req.user.phone || "",
+      founderLocation: founderLocation || "",
+      dateFound: dateFound || Date.now(),
+      message: message || "I have found this item.",
+      proofImage: req.file ? req.file.filename : "",
+      status: "Pending",
+    });
+
+    // Update item status to Pending and record founder
+    item.status = "Pending";
+    item.founder = req.user._id;
+    await item.save();
+
+    // Create Notification for the original owner of the lost item
+    await Notification.create({
+      user: item.user,
+      sender: req.user._id,
+      item: item._id,
+      claim: claim._id,
+      title: `Item Found: ${item.title}`,
+      message: `${req.user.name} reported finding your ${item.title} at ${founderLocation || "campus"}. Open to review founder details and claim!`,
+      type: "ItemFound",
+      isRead: false,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Found report submitted! The item owner has been notified.",
+      claim,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==========================================
+// Owner Confirms and Claims Their Found Item
+// PUT /api/reports/confirm/:claimId
+// Private
+// ==========================================
+const confirmClaimByOwner = async (req, res) => {
+  try {
+    const claim = await Claim.findById(req.params.claimId)
+      .populate("item")
+      .populate("user", "name email phone");
+
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        message: "Claim / Found report not found",
+      });
+    }
+
+    const item = await Item.findById(claim.item._id || claim.item);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found",
+      });
+    }
+
+    // Verify logged-in user is the owner
+    const isOwner =
+      item.user.toString() === req.user._id.toString() ||
+      (claim.owner && claim.owner.toString() === req.user._id.toString());
+
+    if (!isOwner && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only the item owner can confirm and claim this item.",
+      });
+    }
+
+    // Update claim status to Confirmed
+    claim.status = "Confirmed";
+    claim.confirmedAt = new Date();
+    await claim.save();
+
+    // Update item status to Found (recovered) and move to Found items
+    item.status = "Found";
+    item.type = "Found";
+    await item.save();
+
+    // Notify the finder
+    await Notification.create({
+      user: claim.user._id || claim.user,
+      sender: req.user._id,
+      item: item._id,
+      claim: claim._id,
+      title: `Claim Confirmed: ${item.title}`,
+      message: `${req.user.name} confirmed your report and claimed their ${item.title}! Thank you for your assistance.`,
+      type: "ClaimConfirmed",
+      isRead: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Item successfully claimed and marked as Found!",
+      claim,
+      item,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==========================================
+// Owner Rejects False Found Report
+// PUT /api/reports/reject/:claimId
+// Private
+// ==========================================
+const rejectClaimByOwner = async (req, res) => {
+  try {
+    const claim = await Claim.findById(req.params.claimId).populate("item");
+
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        message: "Claim not found",
+      });
+    }
+
+    const item = await Item.findById(claim.item._id || claim.item);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found",
+      });
+    }
+
+    const isOwner =
+      item.user.toString() === req.user._id.toString() ||
+      (claim.owner && claim.owner.toString() === req.user._id.toString());
+
+    if (!isOwner && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only the item owner can reject this report.",
+      });
+    }
+
+    claim.status = "Rejected";
+    await claim.save();
+
+    // Revert item status to Lost
+    item.status = "Lost";
+    item.founder = null;
+    await item.save();
+
+    // Notify the finder
+    await Notification.create({
+      user: claim.user,
+      sender: req.user._id,
+      item: item._id,
+      claim: claim._id,
+      title: `Report Not Matched: ${item.title}`,
+      message: `The owner verified the details and determined that this is not their missing ${item.title}.`,
+      type: "Claim",
+      isRead: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Report marked as not matched. Item status reverted to Lost.",
+      claim,
+      item,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==========================================
+// Get Claim Details for an Item
+// GET /api/reports/item/:itemId
+// Private
+// ==========================================
+const getItemClaims = async (req, res) => {
+  try {
+    const claims = await Claim.find({ item: req.params.itemId })
+      .populate("user", "name email phone studentId")
+      .populate("owner", "name email phone studentId")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: claims.length,
+      claims,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==========================================
+// General Submit Claim (Owner claims a Found Item)
 // POST /api/reports/claim/:itemId
 // Private
 // ==========================================
@@ -20,24 +272,40 @@ const submitClaim = async (req, res) => {
       });
     }
 
-    // Check duplicate claim
     const alreadyClaimed = await Claim.findOne({
       user: req.user._id,
       item: item._id,
+      status: { $ne: "Rejected" },
     });
 
     if (alreadyClaimed) {
       return res.status(400).json({
         success: false,
-        message: "You have already submitted a claim.",
+        message: "You have already submitted a claim for this item.",
       });
     }
 
     const claim = await Claim.create({
       user: req.user._id,
       item: item._id,
+      owner: item.user,
+      claimType: "OWNER_CLAIM",
+      founderName: req.user.name,
+      founderContact: req.user.phone || "",
       message,
       proofImage: req.file ? req.file.filename : "",
+      status: "Pending",
+    });
+
+    // Notify item reporter
+    await Notification.create({
+      user: item.user,
+      sender: req.user._id,
+      item: item._id,
+      claim: claim._id,
+      title: `Claim Submitted: ${item.title}`,
+      message: `${req.user.name} submitted a claim for ${item.title}. Check proof to confirm.`,
+      type: "Claim",
     });
 
     res.status(201).json({
@@ -45,7 +313,6 @@ const submitClaim = async (req, res) => {
       message: "Claim submitted successfully",
       claim,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -61,11 +328,12 @@ const submitClaim = async (req, res) => {
 // ==========================================
 const getMyClaims = async (req, res) => {
   try {
-
     const claims = await Claim.find({
-      user: req.user._id,
+      $or: [{ user: req.user._id }, { owner: req.user._id }],
     })
       .populate("item")
+      .populate("user", "name email phone")
+      .populate("owner", "name email phone")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -73,7 +341,6 @@ const getMyClaims = async (req, res) => {
       count: claims.length,
       claims,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -89,7 +356,6 @@ const getMyClaims = async (req, res) => {
 // ==========================================
 const cancelClaim = async (req, res) => {
   try {
-
     const claim = await Claim.findById(req.params.id);
 
     if (!claim) {
@@ -99,7 +365,7 @@ const cancelClaim = async (req, res) => {
       });
     }
 
-    if (claim.user.toString() !== req.user._id.toString()) {
+    if (claim.user.toString() !== req.user._id.toString() && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
         message: "Unauthorized",
@@ -112,7 +378,6 @@ const cancelClaim = async (req, res) => {
       success: true,
       message: "Claim cancelled successfully",
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -128,17 +393,17 @@ const cancelClaim = async (req, res) => {
 // ==========================================
 const getAllClaims = async (req, res) => {
   try {
-
     const claims = await Claim.find()
-      .populate("user", "name email")
-      .populate("item", "itemName category");
+      .populate("user", "name email phone studentId")
+      .populate("owner", "name email phone studentId")
+      .populate("item", "title category location type status image")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
       count: claims.length,
       claims,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -148,13 +413,12 @@ const getAllClaims = async (req, res) => {
 };
 
 // ==========================================
-// Update Claim Status
+// Update Claim Status (Admin)
 // PUT /api/reports/:id
 // Private/Admin
 // ==========================================
 const updateClaimStatus = async (req, res) => {
   try {
-
     const { status, adminRemark } = req.body;
 
     const claim = await Claim.findById(req.params.id);
@@ -169,15 +433,24 @@ const updateClaimStatus = async (req, res) => {
     claim.status = status;
     claim.adminRemark = adminRemark || "";
 
+    if (status === "Approved" || status === "Confirmed") {
+      claim.confirmedAt = new Date();
+    }
+
     await claim.save();
 
     // Update Item Status
-    if (status === "Approved") {
-
+    if (status === "Approved" || status === "Confirmed") {
       await Item.findByIdAndUpdate(claim.item, {
-        status: "Claimed",
+        status: "Found",
+        type: "Found",
       });
-
+    } else if (status === "Rejected") {
+      await Item.findByIdAndUpdate(claim.item, {
+        status: "Lost",
+        type: "Lost",
+        founder: null,
+      });
     }
 
     // Notification
@@ -187,9 +460,9 @@ const updateClaimStatus = async (req, res) => {
       claim: claim._id,
       title: `Claim ${status}`,
       message:
-        status === "Approved"
-          ? "Congratulations! Your claim has been approved."
-          : "Sorry! Your claim has been rejected.",
+        status === "Approved" || status === "Confirmed"
+          ? "Congratulations! Your claim / found report has been approved."
+          : "Your claim / found report has been marked as rejected.",
       type: "Claim",
     });
 
@@ -198,7 +471,6 @@ const updateClaimStatus = async (req, res) => {
       message: "Claim status updated successfully",
       claim,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -208,6 +480,10 @@ const updateClaimStatus = async (req, res) => {
 };
 
 module.exports = {
+  submitFoundMatch,
+  confirmClaimByOwner,
+  rejectClaimByOwner,
+  getItemClaims,
   submitClaim,
   getMyClaims,
   cancelClaim,

@@ -354,3 +354,138 @@
   .search-input { font-size: 14px; padding: 16px 40px 16px 50px; }
   .card-grid { gap: 25px; }
 }
+
+/* ===========================
+   STATUS FILTERS & BADGES
+=========================== */
+.status-filter-pills {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.filter-pill.active {
+  background: linear-gradient(135deg, rgba(255, 75, 43, 0.2), rgba(255, 65, 108, 0.3));
+  border-color: var(--neon-red);
+  color: #ffffff;
+  box-shadow: 0 0 15px rgba(255, 75, 43, 0.4);
+}
+
+/* Badges on cards */
+.badge-icon {
+  margin-right: 5px;
+}
+
+.badge-pending {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(245, 158, 11, 0.25);
+  border: 1px solid #f59e0b;
+  color: #fbbf24;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+  z-index: 2;
+  backdrop-filter: blur(10px);
+}
+
+.badge-found-state {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #10b981;
+  color: #34d399;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  z-index: 2;
+  backdrop-filter: blur(10px);
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pill-lost {
+  background: rgba(255, 75, 43, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 75, 43, 0.3);
+}
+
+.pill-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.pill-found {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.gradient-btn-amber {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+}
+
+.gradient-btn-amber:hover {
+  box-shadow: 0 15px 35px rgba(245, 158, 11, 0.6);
+  transform: translateY(-3px);
+}
+
+.gradient-btn-green {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+}
+
+.gradient-btn-green:hover {
+  box-shadow: 0 15px 35px rgba(16, 185, 129, 0.6);
+  transform: translateY(-3px);
+}

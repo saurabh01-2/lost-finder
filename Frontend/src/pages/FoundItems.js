@@ -99,7 +99,9 @@ const fetchFoundItems = async () => {
                       e.target.src = "/no-image.png";
                     }}
                   />
-                  <span className="badge-found glass-badge">Found</span>
+                  <span className={`badge-found glass-badge ${item.status === 'Claimed' ? 'badge-claimed' : ''}`}>
+                    {item.status === "Claimed" ? "Claimed" : "Found"}
+                  </span>
                 </div>
 
                 <div className="card-body">
@@ -118,7 +120,7 @@ const fetchFoundItems = async () => {
                   </div>
 
                   <Link to={`/item/${item._id}`} className="details-btn gradient-btn-green">
-                    <span>Claim Item</span>
+                    <span>{item.status === "Claimed" ? "View Details" : "Claim Item"}</span>
                     <FaArrowRight className="btn-arrow" />
                   </Link>
                 </div>

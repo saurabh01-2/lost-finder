@@ -27,6 +27,7 @@ const userRoutes = require("./routes/userRoutes");
 const itemRoutes = require("./routes/itemRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 // ==========================
 // Error Middleware
@@ -41,6 +42,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ==========================
 // Global Error Middleware

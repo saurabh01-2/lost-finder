@@ -37,11 +37,21 @@ const notificationSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Sender who caused the notification (e.g. founder or claimant)
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
     // Notification Type
     type: {
       type: String,
       enum: [
+        "ItemFound",
         "Claim",
+        "ClaimConfirmed",
+        "ClaimApproved",
         "Item",
         "System",
         "Admin"

@@ -17,6 +17,8 @@ const createItem = async (req, res) => {
       contact,
     } = req.body;
 
+    const initialStatus = req.body.status || (type === "Lost" ? "Lost" : "Found");
+
     const item = await Item.create({
       user: req.user._id,
       title,
@@ -26,6 +28,7 @@ const createItem = async (req, res) => {
       location,
       date,
       contact,
+      status: initialStatus,
       image: req.file ? req.file.filename : "",
     });
 
@@ -49,49 +52,52 @@ const createItem = async (req, res) => {
 // ========================================
 const getAllItems = async (req, res) => {
   try {
-    const { category, type, search } = req.query;
+    const { category, type, status, search } = req.query;
 
-    let filter = {};
+    const conditions = [];
 
     if (category && category !== "All") {
-      filter.category = category;
+      conditions.push({ category });
     }
 
-    if (type) {
-      filter.type = type;
+    if (type === "Lost") {
+      // Lost items page: only show items that are still lost or pending claim
+      conditions.push({ 
+        type: "Lost", 
+        status: { $nin: ["Found", "Claimed", "Returned"] } 
+      });
+    } else if (type === "Found") {
+      // Found items page: include reported found items and recovered lost items
+      conditions.push({
+        $or: [
+          { type: "Found" },
+          { status: { $in: ["Found", "Claimed", "Returned"] } },
+        ],
+      });
+    } else if (type) {
+      conditions.push({ type });
+    }
+
+    if (status && status !== "All") {
+      conditions.push({ status });
     }
 
     if (search) {
-      filter.$or = [
-        {
-          title: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          description: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          location: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          category: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-      ];
+      conditions.push({
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+          { location: { $regex: search, $options: "i" } },
+          { category: { $regex: search, $options: "i" } },
+        ],
+      });
     }
+
+    const filter = conditions.length > 0 ? { $and: conditions } : {};
 
     const items = await Item.find(filter)
       .populate("user", "name email phone")
+      .populate("founder", "name email phone")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -114,10 +120,9 @@ const getAllItems = async (req, res) => {
 // ========================================
 const getSingleItem = async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id).populate(
-      "user",
-      "name email phone"
-    );
+    const item = await Item.findById(req.params.id)
+      .populate("user", "name email phone studentId")
+      .populate("founder", "name email phone studentId");
 
     if (!item) {
       return res.status(404).json({

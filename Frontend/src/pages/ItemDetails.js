@@ -7,10 +7,14 @@ import {
   FaTags, 
   FaAlignLeft,
   FaCheckCircle,
-  FaExclamationCircle,
+  FaTimesCircle,
   FaUserAlt,
   FaPhoneAlt,
-  FaEnvelope
+  FaEnvelope,
+  FaHandHoldingHeart,
+  FaClock,
+  FaExclamationTriangle,
+  FaCamera
 } from "react-icons/fa";
 import "../styles/ItemDetails.css";
 import api from "../services/api";
@@ -20,14 +24,19 @@ function ItemDetails() {
   const navigate = useNavigate();
 
   const [item, setItem] = useState(null);
+  const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modal & Submission State
-  const [showModal, setShowModal] = useState(false);
+  // Claim modal for Found Items
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimProofMessage, setClaimProofMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const currentUser = JSON.parse(localStorage.getItem("user") || "null");
 
   useEffect(() => {
     fetchItem();
+    fetchItemClaims();
   }, [id]);
 
   const fetchItem = async () => {
@@ -43,26 +52,102 @@ function ItemDetails() {
     }
   };
 
-  const handleClaimClick = () => {
-    setShowModal(true); // Open the custom 3D modal instead of alert
+  const fetchItemClaims = async () => {
+    try {
+      const res = await api.get(`/reports/item/${id}`);
+      if (res.data.success) {
+        setClaims(res.data.claims);
+      }
+    } catch (error) {
+      // Non-critical if user doesn't have permissions
+    }
   };
 
-  const confirmClaim = () => {
-    setIsSubmitting(true);
-    // Simulate processing time before showing success
-    setTimeout(() => {
+  // Find active pending claim or confirmed claim
+  const activePendingClaim = claims.find((c) => c.status === "Pending");
+  const confirmedClaim = claims.find((c) => c.status === "Confirmed" || c.status === "Approved");
+
+  const isOwner =
+    currentUser &&
+    item &&
+    (item.user?._id === currentUser._id || item.user === currentUser._id);
+
+  // Owner Confirms and Claims their item
+  const handleOwnerConfirmClaim = async (claimId) => {
+    const confirmAction = window.confirm(
+      "Confirm that this is your item and you have verified the founder's details?"
+    );
+    if (!confirmAction) return;
+
+    try {
+      setIsSubmitting(true);
+      const res = await api.put(`/reports/confirm/${claimId}`);
+      if (res.data.success) {
+        alert("🎉 Congratulations! Item marked as Found and claimed successfully!");
+        fetchItem();
+        fetchItemClaims();
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to confirm claim.");
+    } finally {
       setIsSubmitting(false);
-      setShowModal(false);
-      alert("Claim request sent successfully! ✨");
-      navigate(-1); // Go back to the previous page
-    }, 1500);
+    }
+  };
+
+  // Owner Rejects false found report
+  const handleOwnerRejectClaim = async (claimId) => {
+    const confirmAction = window.confirm(
+      "Are you sure this is NOT your item? The item status will revert back to 'Lost'."
+    );
+    if (!confirmAction) return;
+
+    try {
+      setIsSubmitting(true);
+      const res = await api.put(`/reports/reject/${claimId}`);
+      if (res.data.success) {
+        alert("Report rejected. Item status reverted back to Lost.");
+        fetchItem();
+        fetchItemClaims();
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to reject report.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Submit General Claim for a Found Item
+  const handleGeneralClaimSubmit = async (e) => {
+    e.preventDefault();
+    if (!claimProofMessage.trim()) {
+      alert("Please provide proof or details describing why this is your item.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const res = await api.post(`/reports/claim/${item._id}`, {
+        message: claimProofMessage,
+      });
+
+      if (res.data.success) {
+        alert("Claim submitted successfully! The person who found it has been notified.");
+        setShowClaimModal(false);
+        setClaimProofMessage("");
+        fetchItemClaims();
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || "Claim submission failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (loading) {
     return (
       <div className="details-canvas center-content">
         <div className="loader-ring"></div>
-        <h2 className="loading-text">Decrypting item data...</h2>
+        <h2 className="loading-text">Loading item data...</h2>
       </div>
     );
   }
@@ -76,9 +161,15 @@ function ItemDetails() {
     );
   }
 
-  // Determine theme based on status
-  const isLost = item.status === "Lost";
-  const themeClass = isLost ? "theme-lost" : "theme-found";
+  const isStatusLost = item.status === "Lost";
+  const isStatusPending = item.status === "Pending";
+  const isStatusFound = item.status === "Found" || item.status === "Claimed";
+
+  const themeClass = isStatusFound
+    ? "theme-found"
+    : isStatusPending
+    ? "theme-pending"
+    : "theme-lost";
 
   return (
     <div className="details-canvas">
@@ -90,7 +181,7 @@ function ItemDetails() {
         
         {/* Navigation */}
         <button className="back-btn glass-panel" onClick={() => navigate(-1)}>
-          <FaArrowLeft /> <span>Back to List</span>
+          <FaArrowLeft /> <span>Back</span>
         </button>
 
         {/* Main Details Glass Card */}
@@ -119,7 +210,15 @@ function ItemDetails() {
             <div className="details-info-container">
               
               <div className="info-header">
-                <span className="category-tag"><FaTags /> {item.category}</span>
+                <div className="badge-row">
+                  <span className="category-tag"><FaTags /> {item.category}</span>
+                  <span className={`type-tag tag-${item.type.toLowerCase()}`}>
+                    Type: {item.type}
+                  </span>
+                  <span className={`status-tag-pill status-${(item.status || "lost").toLowerCase()}`}>
+                    Status: {item.status}
+                  </span>
+                </div>
                 <h1>{item.title}</h1>
               </div>
 
@@ -136,7 +235,14 @@ function ItemDetails() {
                   <div className="icon-box"><FaCalendarAlt /></div>
                   <div>
                     <h4>Date</h4>
-                    <p>{new Date(item.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p>
+                      {new Date(item.date).toLocaleDateString(undefined, { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
                   </div>
                 </div>
 
@@ -151,23 +257,133 @@ function ItemDetails() {
 
               <hr className="glass-divider" />
 
+              {/* Poster Contact Info */}
               <div className="contact-info">
-                <h3>Contact Information</h3>
+                <h3>{item.type === "Lost" ? "Original Poster (Owner)" : "Reported By"}</h3>
                 <div className="contact-grid">
-                  <p><FaUserAlt className="contact-icon" /> {item.user?.name || "Unknown User"}</p>
+                  <p><FaUserAlt className="contact-icon" /> {item.user?.name || "Campus Member"}</p>
                   <p><FaPhoneAlt className="contact-icon" /> {item.contact || "N/A"}</p>
                   <p><FaEnvelope className="contact-icon" /> {item.user?.email || "N/A"}</p>
                 </div>
               </div>
 
+              {/* ======================================================= */}
+              {/* FOUNDER DETAILS & OWNER CONFIRMATION SECTION            */}
+              {/* ======================================================= */}
+              {isOwner && activePendingClaim && (
+                <div className="founder-card glass-panel fade-up">
+                  <div className="founder-card-header">
+                    <FaHandHoldingHeart className="founder-icon pulse" />
+                    <div>
+                      <h3>Someone Reported Finding Your Item!</h3>
+                      <p>Review the founder's details below to verify and claim your belonging.</p>
+                    </div>
+                  </div>
+
+                  <div className="founder-details-grid">
+                    <div className="founder-item">
+                      <span className="label">Founder Name:</span>
+                      <span className="val">{activePendingClaim.founderName || activePendingClaim.user?.name}</span>
+                    </div>
+                    <div className="founder-item">
+                      <span className="label">Founder Contact:</span>
+                      <span className="val highlight-phone">
+                        <FaPhoneAlt className="mini-icon" /> {activePendingClaim.founderContact || activePendingClaim.user?.phone || "N/A"}
+                      </span>
+                    </div>
+                    <div className="founder-item">
+                      <span className="label">Founder Email:</span>
+                      <span className="val">{activePendingClaim.user?.email || "N/A"}</span>
+                    </div>
+                    <div className="founder-item">
+                      <span className="label">Found Location:</span>
+                      <span className="val">{activePendingClaim.founderLocation || "Campus"}</span>
+                    </div>
+                    <div className="founder-item full-width">
+                      <span className="label">Founder's Message / Notes:</span>
+                      <p className="founder-note">{activePendingClaim.message}</p>
+                    </div>
+
+                    {activePendingClaim.proofImage && (
+                      <div className="founder-item full-width">
+                        <span className="label"><FaCamera /> Founder's Photo of Item:</span>
+                        <div className="founder-photo-box">
+                          <img 
+                            src={`http://localhost:5000/uploads/${activePendingClaim.proofImage}`} 
+                            alt="Found Item Proof"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Owner Action Buttons */}
+                  <div className="founder-actions">
+                    <button 
+                      className="confirm-claim-btn gradient-btn-green"
+                      onClick={() => handleOwnerConfirmClaim(activePendingClaim._id)}
+                      disabled={isSubmitting}
+                    >
+                      <FaCheckCircle />
+                      <span>{isSubmitting ? "Confirming..." : "Confirm & Claim My Item"}</span>
+                    </button>
+
+                    <button 
+                      className="reject-claim-btn"
+                      onClick={() => handleOwnerRejectClaim(activePendingClaim._id)}
+                      disabled={isSubmitting}
+                    >
+                      <FaTimesCircle />
+                      <span>Not My Item</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Resolved / Found State Banner */}
+              {isStatusFound && (
+                <div className="found-celebration-banner glass-panel">
+                  <FaCheckCircle className="celebration-icon" />
+                  <div>
+                    <h4>Item Successfully Recovered!</h4>
+                    <p>
+                      This item has been confirmed as claimed and returned to its rightful owner.
+                      {confirmedClaim && ` Verified on ${new Date(confirmedClaim.confirmedAt || confirmedClaim.updatedAt).toLocaleDateString()}.`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ======================================================= */}
+              {/* ACTION SECTION FOR VISITORS (Not owner)                 */}
+              {/* ======================================================= */}
               <div className="action-section">
-                <button 
-                  className="claim-trigger-btn gradient-btn-dynamic"
-                  onClick={handleClaimClick}
-                >
-                  <span>{isLost ? "I Found This Item" : "Claim This Item"}</span>
-                  <FaCheckCircle className="btn-icon" />
-                </button>
+                {!isOwner && item.type === "Lost" && isStatusLost && (
+                  <Link 
+                    to={`/report-found?lostItemId=${item._id}`}
+                    className="claim-trigger-btn gradient-btn-dynamic"
+                  >
+                    <FaHandHoldingHeart className="btn-icon" />
+                    <span>I Found This Item!</span>
+                  </Link>
+                )}
+
+                {!isOwner && item.type === "Lost" && isStatusPending && (
+                  <div className="pending-notice glass-panel">
+                    <FaClock className="notice-icon" />
+                    <span>A founder has reported finding this item. Verification is pending with the owner.</span>
+                  </div>
+                )}
+
+                {!isOwner && item.type === "Found" && !isStatusFound && (
+                  <button 
+                    className="claim-trigger-btn gradient-btn-dynamic"
+                    onClick={() => setShowClaimModal(true)}
+                  >
+                    <FaCheckCircle className="btn-icon" />
+                    <span>Claim This Found Item</span>
+                  </button>
+                )}
               </div>
 
             </div>
@@ -175,41 +391,52 @@ function ItemDetails() {
         </div>
       </div>
 
-      {/* 3D Glassmorphism Popup Modal */}
-      {showModal && (
+      {/* Modal: Claiming a Found Item */}
+      {showClaimModal && (
         <div className="modal-overlay">
           <div className="modal-content glass-panel">
-            <button className="close-modal" onClick={() => setShowModal(false)}>&times;</button>
+            <button className="close-modal" onClick={() => setShowClaimModal(false)}>&times;</button>
             
-            <div className={`modal-icon ${themeClass}`}>
-              <FaExclamationCircle />
+            <div className="modal-icon">
+              <FaCheckCircle style={{ color: "var(--neon-cyan)" }} />
             </div>
             
-            <h2>Confirm Action</h2>
-            <p>
-              Are you sure you want to <strong>{isLost ? "report that you found" : "claim"}</strong> the <strong>{item.title}</strong>? 
-              This will notify the original poster and initiate contact.
-            </p>
+            <h2>Claim {item.title}</h2>
+            <p>Please provide proof or description of ownership so the founder or admin can verify you.</p>
 
-            <div className="modal-buttons">
-              <button 
-                className="cancel-btn" 
-                onClick={() => setShowModal(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button 
-                className="confirm-btn gradient-btn-dynamic" 
-                onClick={confirmClaim}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Processing..." : "Yes, Confirm"}
-              </button>
-            </div>
+            <form onSubmit={handleGeneralClaimSubmit}>
+              <div className="modal-input-box">
+                <textarea
+                  rows="4"
+                  placeholder="e.g. Unique markings, serial numbers, wallpaper on phone, contents inside..."
+                  value={claimProofMessage}
+                  onChange={(e) => setClaimProofMessage(e.target.value)}
+                  required
+                ></textarea>
+              </div>
+
+              <div className="modal-buttons">
+                <button 
+                  type="button" 
+                  className="cancel-btn" 
+                  onClick={() => setShowClaimModal(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="confirm-btn gradient-btn-green" 
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Claim"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

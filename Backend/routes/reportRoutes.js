@@ -1,8 +1,11 @@
 const express = require("express");
-
 const router = express.Router();
 
 const {
+  submitFoundMatch,
+  confirmClaimByOwner,
+  rejectClaimByOwner,
+  getItemClaims,
   submitClaim,
   getMyClaims,
   cancelClaim,
@@ -15,10 +18,35 @@ const { adminOnly } = require("../middleware/adminMiddleware");
 const upload = require("../middleware/upload");
 
 // ============================================
-// Student Routes
+// Founder & Owner Flow Routes
 // ============================================
 
-// Submit Claim
+// Founder reports finding a lost item
+// POST /api/reports/found-match/:itemId
+router.post(
+  "/found-match/:itemId",
+  protect,
+  upload.single("proofImage"),
+  submitFoundMatch
+);
+
+// Owner confirms & claims their item
+// PUT /api/reports/confirm/:claimId
+router.put("/confirm/:claimId", protect, confirmClaimByOwner);
+
+// Owner rejects false report
+// PUT /api/reports/reject/:claimId
+router.put("/reject/:claimId", protect, rejectClaimByOwner);
+
+// Get claims/founder reports for an item
+// GET /api/reports/item/:itemId
+router.get("/item/:itemId", protect, getItemClaims);
+
+// ============================================
+// Standard Claim Routes
+// ============================================
+
+// Submit Claim (Claimant claiming a found item)
 // POST /api/reports/claim/:itemId
 router.post(
   "/claim/:itemId",

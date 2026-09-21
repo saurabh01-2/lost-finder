@@ -69,8 +69,15 @@ const itemSchema = new mongoose.Schema(
     // Item Status
     status: {
       type: String,
-      enum: ["Pending", "Claimed", "Returned"],
-      default: "Pending",
+      enum: ["Lost", "Pending", "Found", "Claimed", "Returned"],
+      default: "Lost",
+    },
+
+    // Founder who reported finding this lost item
+    founder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
 
     // User who reported item

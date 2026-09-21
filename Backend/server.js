@@ -6,7 +6,21 @@ const app = require("./app");
 dotenv.config();
 
 // Connect to MongoDB
-connectDB();
+connectDB().then(async () => {
+  try {
+    const User = require("./models/User");
+    const adminUser = await User.findOneAndUpdate(
+      { email: "jeehardik2@gmail.com" },
+      { role: "admin" },
+      { new: true }
+    );
+    if (adminUser) {
+      console.log("👑 User jeehardik2@gmail.com has been verified as ADMIN.");
+    }
+  } catch (e) {
+    // Ignore if DB not reachable on initial boot
+  }
+});
 
 // Port
 const PORT = process.env.PORT || 5000;

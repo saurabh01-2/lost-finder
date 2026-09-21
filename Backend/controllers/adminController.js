@@ -9,19 +9,18 @@ const Claim = require("../models/Claim");
 const getDashboardStats = async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
-
     const totalItems = await Item.countDocuments();
 
     const lostItems = await Item.countDocuments({
-      type: "Lost",
-    });
-
-    const foundItems = await Item.countDocuments({
-      type: "Found",
+      status: "Lost",
     });
 
     const pendingItems = await Item.countDocuments({
       status: "Pending",
+    });
+
+    const foundItems = await Item.countDocuments({
+      status: { $in: ["Found", "Claimed", "Returned"] },
     });
 
     const totalClaims = await Claim.countDocuments();
@@ -30,19 +29,23 @@ const getDashboardStats = async (req, res) => {
       status: "Pending",
     });
 
+    const confirmedClaims = await Claim.countDocuments({
+      status: { $in: ["Confirmed", "Approved"] },
+    });
+
     res.status(200).json({
       success: true,
       stats: {
         totalUsers,
         totalItems,
         lostItems,
-        foundItems,
         pendingItems,
+        foundItems,
         totalClaims,
         pendingClaims,
+        confirmedClaims,
       },
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -57,7 +60,6 @@ const getDashboardStats = async (req, res) => {
 // ==========================================
 const getAllUsers = async (req, res) => {
   try {
-
     const users = await User.find()
       .select("-password")
       .sort({ createdAt: -1 });
@@ -67,7 +69,6 @@ const getAllUsers = async (req, res) => {
       count: users.length,
       users,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -82,7 +83,6 @@ const getAllUsers = async (req, res) => {
 // ==========================================
 const toggleUserStatus = async (req, res) => {
   try {
-
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -93,7 +93,6 @@ const toggleUserStatus = async (req, res) => {
     }
 
     user.isActive = !user.isActive;
-
     await user.save();
 
     res.status(200).json({
@@ -103,7 +102,6 @@ const toggleUserStatus = async (req, res) => {
         : "User Blocked Successfully",
       user,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -118,7 +116,6 @@ const toggleUserStatus = async (req, res) => {
 // ==========================================
 const deleteUser = async (req, res) => {
   try {
-
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -134,7 +131,6 @@ const deleteUser = async (req, res) => {
       success: true,
       message: "User Deleted Successfully",
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -149,9 +145,9 @@ const deleteUser = async (req, res) => {
 // ==========================================
 const getAllItems = async (req, res) => {
   try {
-
     const items = await Item.find()
-      .populate("user", "name email")
+      .populate("user", "name email phone studentId")
+      .populate("founder", "name email phone studentId")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -159,7 +155,38 @@ const getAllItems = async (req, res) => {
       count: items.length,
       items,
     });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
+// ==========================================
+// Update Item Status (Admin)
+// PUT /api/admin/items/:id/status
+// ==========================================
+const updateItemStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const item = await Item.findById(req.params.id);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found",
+      });
+    }
+
+    item.status = status;
+    await item.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Item status updated to ${status}`,
+      item,
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -174,7 +201,6 @@ const getAllItems = async (req, res) => {
 // ==========================================
 const deleteItem = async (req, res) => {
   try {
-
     const item = await Item.findById(req.params.id);
 
     if (!item) {
@@ -190,7 +216,6 @@ const deleteItem = async (req, res) => {
       success: true,
       message: "Item Deleted Successfully",
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -205,5 +230,6 @@ module.exports = {
   toggleUserStatus,
   deleteUser,
   getAllItems,
+  updateItemStatus,
   deleteItem,
 };

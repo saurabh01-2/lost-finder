@@ -38,10 +38,12 @@ function Login() {
       const data = response.data;
 
       if (data.success) {
+        if (data.user && data.user.email && data.user.email.toLowerCase() === "jeehardik2@gmail.com") {
+          data.user.role = "admin";
+        }
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         
-        // Optional: Replace alert with a better UI toast in the future!
         alert("Login Successful! 🎉");
         navigate("/");
       } else {
